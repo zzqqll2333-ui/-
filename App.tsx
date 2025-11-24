@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { StageInput } from './components/StageInput';
 import { StageStory } from './components/StageStory';
@@ -25,9 +26,26 @@ function App() {
       setStoryData(data);
       saveStoryToHistory(data); // Save initial script
       setStep(AppStep.REFINEMENT);
-    } catch (err) {
-      setError("无法生成剧本，请重试或检查您的网络连接。");
-      console.error(err);
+    } catch (err: any) {
+      // Show the actual error message from the service
+      let errorMessage = "生成失败";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      // Add helpful context for common errors
+      if (errorMessage.includes("API Key is missing")) {
+        errorMessage = "配置错误: 找不到 API Key。请在 Vercel 环境变量中添加 API_KEY 并重新部署。";
+      } else if (errorMessage.includes("429")) {
+        errorMessage = "配额超限 (429): API 调用过于频繁，请稍后再试。";
+      } else if (errorMessage.includes("503")) {
+        errorMessage = "服务繁忙 (503): Google AI 服务暂时不可用，请稍后重试。";
+      }
+
+      setError(errorMessage);
+      console.error("Full Error Object:", err);
     } finally {
       setIsLoading(false);
     }
@@ -187,8 +205,9 @@ function App() {
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {error && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/50 text-red-400 rounded-lg flex items-center justify-center">
-             {error}
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/50 text-red-200 rounded-lg flex flex-col items-center justify-center text-center">
+             <span className="font-bold mb-1 text-red-400">出错了</span>
+             <span>{error}</span>
           </div>
         )}
 

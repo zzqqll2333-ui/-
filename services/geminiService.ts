@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type, Schema, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { StoryData } from "../types";
 
 const getClient = () => {
@@ -95,17 +95,34 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
         responseMimeType: "application/json",
         responseSchema: storySchema,
         temperature: 0.7,
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
       },
     });
 
     let text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) throw new Error("AI returned an empty response. Likely a safety block.");
     
-    if (text.trim().startsWith("```")) {
-        text = text.replace(/^```(json)?\s*/, "").replace(/\s*```$/, "");
+    // Robust JSON extraction
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      text = jsonMatch[0];
+    } else {
+      // Fallback cleanup if regex fails but it looks like JSON
+      text = text.replace(/^```(json)?\s*/, "").replace(/\s*```$/, "");
     }
     
-    const data = JSON.parse(text) as Partial<StoryData>;
+    let data: Partial<StoryData>;
+    try {
+        data = JSON.parse(text) as Partial<StoryData>;
+    } catch (e) {
+        console.error("JSON Parse Error. Raw Text:", text);
+        throw new Error("Failed to parse AI response. The model might be overloaded.");
+    }
     
     const completeData: StoryData = {
         ...data,
