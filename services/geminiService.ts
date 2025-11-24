@@ -124,12 +124,17 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
     if (!text) throw new Error("AI returned an empty response. Likely a safety block.");
     
     // Robust JSON extraction
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      text = jsonMatch[0];
+    // 1. Try to find markdown code block first
+    const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (match) {
+        text = match[1];
     } else {
-      // Fallback cleanup if regex fails but it looks like JSON
-      text = text.replace(/^```(json)?\s*/, "").replace(/\s*```$/, "");
+        // 2. Fallback: find the first { and last }
+        const firstOpen = text.indexOf('{');
+        const lastClose = text.lastIndexOf('}');
+        if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+            text = text.substring(firstOpen, lastClose + 1);
+        }
     }
     
     let data: Partial<StoryData>;

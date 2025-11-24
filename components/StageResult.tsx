@@ -1,11 +1,8 @@
+
 import React, { useState } from 'react';
 import { StoryData, Scene } from '../types';
 import { generateSceneImage } from '../services/geminiService';
 import { Download, Film, Users, RefreshCw, Maximize2, X, ArrowLeft, Loader2, Edit3, FileJson, Printer, MapPin, FileText, FileArchive } from 'lucide-react';
-import * as docx from "docx";
-import JSZip from "jszip";
-
-const { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType, BorderStyle } = docx;
 
 interface StageResultProps {
   storyData: StoryData;
@@ -45,6 +42,9 @@ export const StageResult: React.FC<StageResultProps> = ({ storyData, onReset, on
   const handleDownloadZIP = async () => {
     setIsZipping(true);
     try {
+        // Dynamic import to save bundle size
+        const JSZip = (await import("jszip")).default;
+        
         const zip = new JSZip();
         // Create a folder for images
         const imgFolder = zip.folder("images");
@@ -107,6 +107,9 @@ export const StageResult: React.FC<StageResultProps> = ({ storyData, onReset, on
   const handleDownloadWord = async () => {
     setIsGeneratingWord(true);
     try {
+      // Dynamic import to save bundle size
+      const { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType, BorderStyle } = await import("docx");
+
       const base64ToUint8Array = (base64: string) => {
         try {
           const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
