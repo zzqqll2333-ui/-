@@ -3,7 +3,23 @@ import { GoogleGenAI, Type, Schema, HarmCategory, HarmBlockThreshold } from "@go
 import { StoryData } from "../types";
 
 const getClient = () => {
-  const apiKey = process.env.API_KEY;
+  // 1. Try standard process.env (Node/Webpack)
+  let apiKey = process.env.API_KEY;
+
+  // 2. Try Vite-specific import.meta.env (Required for Vercel + Vite)
+  // We use type casting to avoid TypeScript errors if types aren't fully configured
+  if (!apiKey) {
+    try {
+        // @ts-ignore
+        if (import.meta && import.meta.env) {
+            // @ts-ignore
+            apiKey = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+        }
+    } catch (e) {
+        // Ignore errors if import.meta is not defined
+    }
+  }
+
   if (!apiKey) {
     throw new Error("API Key is missing");
   }
