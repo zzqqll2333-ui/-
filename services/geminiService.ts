@@ -1,29 +1,16 @@
-
 import { GoogleGenAI, Type, Schema, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { StoryData } from "../types";
 
 const getClient = () => {
-  // 1. Try standard process.env (Node/Webpack)
-  let apiKey = process.env.API_KEY;
-
-  // 2. Try Vite-specific import.meta.env (Required for Vercel + Vite)
-  // We use type casting to avoid TypeScript errors if types aren't fully configured
-  if (!apiKey) {
-    try {
-        // @ts-ignore
-        if (import.meta && import.meta.env) {
-            // @ts-ignore
-            apiKey = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
-        }
-    } catch (e) {
-        // Ignore errors if import.meta is not defined
-    }
-  }
+  // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+  const apiKey = process.env.API_KEY;
 
   if (!apiKey) {
-    throw new Error("API Key is missing");
+    console.error("API Key not found in process.env");
+    throw new Error("API Key is missing. Please check Vercel Environment Variables.");
   }
-  return new GoogleGenAI({ apiKey });
+  
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 // Defined Schema for Story Generation with Character and Location Consistency
@@ -124,12 +111,10 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
     if (!text) throw new Error("AI returned an empty response. Likely a safety block.");
     
     // Robust JSON extraction
-    // 1. Try to find markdown code block first
     const match = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (match) {
         text = match[1];
     } else {
-        // 2. Fallback: find the first { and last }
         const firstOpen = text.indexOf('{');
         const lastClose = text.lastIndexOf('}');
         if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
@@ -150,7 +135,7 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
         id: Date.now().toString(),
         createdAt: Date.now(),
         style: style,
-        locations: data.locations || [], // Ensure locations array exists
+        locations: data.locations || [], 
     } as StoryData;
 
     return completeData;
@@ -163,7 +148,6 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
 export const generateSceneImage = async (visualPrompt: string, style?: string): Promise<string> => {
   const ai = getClient();
   
-  // Construct a prompt that enforces the style at the beginning
   const finalPrompt = `(Style: ${style || 'Cinematic'}) ${visualPrompt} . High quality, 8k resolution, highly detailed, cinematic composition.`;
 
   try {
