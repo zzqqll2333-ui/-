@@ -21,7 +21,9 @@ export interface Location {
 export interface Scene {
   scene_number: number;
   description_cn: string;
-  visual_prompt_en: string;
+  visual_prompt_en: string; // Now primarily focuses on Action/Composition
+  character_names?: string[]; // Names of characters present in this scene
+  location_name?: string;     // Name of the location for this scene
   imageUrl?: string;
   imageStatus: 'pending' | 'loading' | 'success' | 'error';
 }
@@ -34,7 +36,7 @@ export interface StoryData {
   logline: string;
   style: string; 
   characters: Character[];
-  locations: Location[]; // Added for background consistency
+  locations: Location[];
   scenes: Scene[];
 }
 

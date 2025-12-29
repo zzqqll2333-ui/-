@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { StoryData } from "../types";
 
@@ -26,9 +27,9 @@ const storySchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          name: { type: Type.STRING, description: "Character name" },
+          name: { type: Type.STRING, description: "Character name (e.g., 'Li Ming')" },
           description_cn: { type: Type.STRING, description: "Brief personality and role description in Chinese." },
-          visual_prompt_en: { type: Type.STRING, description: "A highly detailed physical description in English to be reused in every image prompt (e.g., 'A young woman with neon blue hair, wearing a worn leather jacket and silver goggles')." }
+          visual_prompt_en: { type: Type.STRING, description: "A highly detailed physical description in English. Start with 'A [age] [gender]...'. Include hair style/color, clothing details, and distinctive features. This string will be reused for every scene to ensure consistency." }
         },
         required: ["name", "description_cn", "visual_prompt_en"]
       }
@@ -39,9 +40,9 @@ const storySchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          name: { type: Type.STRING, description: "Location name" },
+          name: { type: Type.STRING, description: "Location name (e.g., 'Cyberpunk Street')" },
           description_cn: { type: Type.STRING, description: "Brief description in Chinese." },
-          visual_prompt_en: { type: Type.STRING, description: "Detailed visual description of the environment in English to be reused in every scene taking place here (e.g., 'A futuristic control room with blue holographic screens and dark metallic walls')." }
+          visual_prompt_en: { type: Type.STRING, description: "Detailed visual description of the environment in English (lighting, colors, key elements). This will be reused for scenes in this location." }
         },
         required: ["name", "description_cn", "visual_prompt_en"]
       }
@@ -54,9 +55,21 @@ const storySchema: Schema = {
         properties: {
           scene_number: { type: Type.INTEGER },
           description_cn: { type: Type.STRING, description: "Detailed script description of action and dialogue in Chinese." },
-          visual_prompt_en: { type: Type.STRING, description: "A highly detailed, cinematic image generation prompt in English. CRITICAL: You must construct this prompt by concatenating the defined Character visual prompt and the Location visual prompt." },
+          character_names: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING }, 
+            description: "EXACT names of characters from the 'characters' list that appear in this scene." 
+          },
+          location_name: { 
+            type: Type.STRING, 
+            description: "EXACT name of the location from the 'locations' list where this scene takes place." 
+          },
+          visual_prompt_en: { 
+            type: Type.STRING, 
+            description: "Description of the ACTION, POSE, EMOTION, and CAMERA ANGLE for this specific shot in English. Do NOT repeat the full character/location physical details here, as they will be automatically appended." 
+          },
         },
-        required: ["scene_number", "description_cn", "visual_prompt_en"],
+        required: ["scene_number", "description_cn", "visual_prompt_en", "character_names", "location_name"],
       },
     },
   },
@@ -79,12 +92,14 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
     2. **Define Locations**: Create the main settings. Write a "visual_prompt_en" for each that describes the permanent background elements.
     3. **Generate Scenes**: Write the script.
     
-    CRITICAL INSTRUCTION FOR SCENE PROMPTS (visual_prompt_en):
-    To ensure consistency, you MUST construct the scene prompt using this structure:
-    "[Style: ${style}]. [Character Visual Description]. [Action/Pose]. [Location Visual Description]. [Lighting/Camera]."
+    CRITICAL CONSISTENCY INSTRUCTION:
+    - In the 'scenes' array, you MUST correctly identify which 'character_names' and 'location_name' are present.
+    - The 'visual_prompt_en' for the scene should focus on WHAT IS HAPPENING (Action, Composition, Lighting) rather than re-describing the character's outfit.
     
-    - DO NOT invent new descriptions for the character or location. COPY AND PASTE the "visual_prompt_en" defined in steps 1 and 2.
-    - Example: "Anime style. A boy with red spiky hair wearing a green vest. Running frantically. A dark alleyway with wet pavement and neon signs. Low angle shot."
+    Example Logic:
+    - Character: "A girl with pink hair in a silver spacesuit."
+    - Scene Action: "Running towards camera, panicked expression. Low angle."
+    - (The system will combine these to generate the image).
     
     Ensure the output is valid JSON matching the schema.
     Content in Chinese (Simplified), Visual Prompts in English.
@@ -148,7 +163,9 @@ export const generateStoryScript = async (userIdea: string, frameCount: number, 
 export const generateSceneImage = async (visualPrompt: string, style?: string): Promise<string> => {
   const ai = getClient();
   
-  const finalPrompt = `(Style: ${style || 'Cinematic'}) ${visualPrompt} . High quality, 8k resolution, highly detailed, cinematic composition.`;
+  // We expect the 'visualPrompt' to be a fully composed prompt (Style + Location + Character + Action)
+  // But we add a safety wrapper just in case.
+  const finalPrompt = `(Art Style: ${style || 'Cinematic'}). ${visualPrompt}. High quality, 8k resolution, highly detailed, cinematic composition.`;
 
   try {
     const response = await ai.models.generateContent({

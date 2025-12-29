@@ -15,6 +15,43 @@ export const StageVisuals: React.FC<StageVisualsProps> = ({ storyData, onComplet
   const [isCompleted, setIsCompleted] = useState(false);
   const hasStartedRef = useRef(false);
 
+  // Helper to construct the full consistent prompt
+  const constructPrompt = (scene: Scene): string => {
+    const parts: string[] = [];
+
+    // 1. Location (Background)
+    if (scene.location_name) {
+      const location = storyData.locations?.find(l => l.name === scene.location_name);
+      if (location) {
+        parts.push(`Background location: ${location.visual_prompt_en}`);
+      }
+    }
+
+    // 2. Characters (Subjects)
+    if (scene.character_names && scene.character_names.length > 0) {
+      const charDescriptions = scene.character_names.map(name => {
+        const char = storyData.characters.find(c => c.name === name);
+        // Explicitly link name to description for the model
+        return char ? `Character ${name}: ${char.visual_prompt_en}` : '';
+      }).filter(Boolean);
+      
+      if (charDescriptions.length > 0) {
+        parts.push(charDescriptions.join('. '));
+      }
+    }
+
+    // 3. Action/Shot (The specific scene content)
+    // We add "Shot:" to distinguish it from the definitions
+    parts.push(`Shot Action: ${scene.visual_prompt_en}`);
+
+    // Fallback: If no metadata tags (legacy stories), just use the raw prompt
+    if (parts.length === 1 && !scene.character_names && !scene.location_name) {
+        return scene.visual_prompt_en;
+    }
+
+    return parts.join('. ');
+  };
+
   useEffect(() => {
     const processQueue = async () => {
       if (hasStartedRef.current) return;
@@ -48,10 +85,14 @@ export const StageVisuals: React.FC<StageVisualsProps> = ({ storyData, onComplet
         const MAX_RETRIES = 3;
         let success = false;
 
+        // Construct the consistent prompt dynamically
+        const compositePrompt = constructPrompt(newScenes[i]);
+        console.log(`[Scene ${i+1} Prompt]`, compositePrompt);
+
         while (!success && retries <= MAX_RETRIES) {
             try {
                 // PASSING STYLE HERE
-                const base64Image = await generateSceneImage(newScenes[i].visual_prompt_en, storyData.style);
+                const base64Image = await generateSceneImage(compositePrompt, storyData.style);
                 newScenes[i] = { 
                     ...newScenes[i], 
                     imageStatus: 'success', 
@@ -83,7 +124,6 @@ export const StageVisuals: React.FC<StageVisualsProps> = ({ storyData, onComplet
         setScenes([...newScenes]);
         
         // Add a substantial delay between successful requests to avoid hitting the limit immediately again.
-        // 4 seconds seems safe for free tier (approx 15 requests/min).
         await new Promise(resolve => setTimeout(resolve, 4000));
       }
 
